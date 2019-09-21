@@ -70,6 +70,7 @@ class Player:
 		self.client = client
 		self.folder = os.path.join(BASE_DIR, downloads_folder)
 		mixer.init()
+		pygame.mixer.music.set_volume(0.1)
 		self.prepare_playlist()
 		threading.Thread(target=self.queue_controller).start()
 
@@ -78,8 +79,9 @@ class Player:
 			try:
 				if mixer.music.get_busy() == 1:
 					time.sleep(0.1)
-				elif ready and not self.paused:
+				elif self.ready and not self.paused:
 					mixer.music.load(self.tracks[self.current_track_number % len(self.tracks)])
+					pygame.mixer.music.set_volume(0.1)
 					mixer.music.play()
 			except:
 				pass
@@ -137,6 +139,8 @@ class Player:
 					print("Searching for device.")
 					if counter > 10:
 						self.stop()
+			except KeyboardInterrupt:
+				exit(0)
 			except:
 				print(traceback.format_exc())
 
