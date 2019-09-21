@@ -1,0 +1,5 @@
+LOGIN = 'mymail@yandex.ru'
+PASSWORD = 'mypassword'
+MAC = "33:33:33:33:33:33"
+
+DOWNLOADS_FOLDER = "downloads"
