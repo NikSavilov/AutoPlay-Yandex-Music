@@ -170,7 +170,9 @@ class Player:
 		for i, song in enumerate(songs):
 			try:
 				print("Downloading: {t}".format(t=song.track.title))
-				song.track.download(os.path.join(folder, str(i) + ".mp3"))
+				filename = "{n}_{t}.mp3".format(n=i, t=song.track.title)
+				filename = "".join([c for c in filename if c.isalpha() or c.isdigit() or c=="."]).rstrip()
+				song.track.download(os.path.join(folder, filename))
 				time.sleep(1)
 			except NetworkError:
 				time.sleep(10)
@@ -204,8 +206,8 @@ if __name__ == "__main__":
 			time.sleep(30)
 	player = Player(DOWNLOADS_FOLDER, client)
 
-	schedule.every().day.at("23:22").do(player.download_playlist, client_obj=client, downloads_folder=DOWNLOADS_FOLDER)
-	schedule.every().day.at("23:30").do(player.delete_playlist)
-	schedule.every().day.at("23:35").do(player.prepare_playlist)
+	schedule.every().day.at(TIME_OF_DOWNLOAD).do(player.download_playlist, client_obj=client, downloads_folder=DOWNLOADS_FOLDER)
+	schedule.every().day.at(TIME_OF_DELETE).do(player.delete_playlist)
+	schedule.every().day.at(TIME_OF_PREPARE).do(player.prepare_playlist)
 
 	player.polling()
