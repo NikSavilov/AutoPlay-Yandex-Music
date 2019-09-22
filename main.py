@@ -65,12 +65,13 @@ class Player:
 	current_track_number = 0
 	ready = False
 	paused = False
+	playing = False
 
 	def __init__(self, downloads_folder, client):
 		self.client = client
 		self.folder = os.path.join(BASE_DIR, downloads_folder)
 		mixer.init()
-		pygame.mixer.music.set_volume(0.1)
+		pygame.mixer.music.set_volume(0.05)
 		self.prepare_playlist()
 		threading.Thread(target=self.queue_controller).start()
 
@@ -79,14 +80,16 @@ class Player:
 			try:
 				if mixer.music.get_busy() == 1:
 					time.sleep(0.1)
-				elif self.ready and not self.paused:
-					mixer.music.load(self.tracks[self.current_track_number % len(self.tracks)])
-					pygame.mixer.music.set_volume(0.1)
+				elif self.ready and self.playing and not self.paused:
+					self.current_track_number += 1
+					mixer.music.load(self.tracks[(self.current_track_number) % len(self.tracks)])
+					pygame.mixer.music.set_volume(0.05)
 					mixer.music.play()
 			except:
 				pass
 
 	def prepare_playlist(self):
+		self.ready = False
 		folders = os.listdir(self.folder)
 		max_date = None
 		for folder in folders:
@@ -112,18 +115,25 @@ class Player:
 			self.download_playlist(self.client, DOWNLOADS_FOLDER)
 
 	def resume(self):
-		if self.ready and not self.paused and mixer.music.get_busy() == 0:
-			self.start()
+		if self.ready and self.playing and self.paused:
+			print("Resumed.")
+			self.paused = False
+			mixer.music.unpause()
 
 	def pause(self):  # blocks resume
-		self.stop()
+		print("Paused.")
+		mixer.music.pause()
 		self.paused = True
 
 	def start(self):
+		print("Started.")
 		if self.ready:
+			self.playing = True
 			mixer.music.play()
 
 	def stop(self):
+		print("Stopped.")
+		self.playing = False
 		mixer.music.stop()
 
 	def polling(self):
@@ -131,14 +141,21 @@ class Player:
 		while True:
 			try:
 				if is_device_in_network(MAC):
-					self.resume()
-					counter = 0
+					if not self.playing and not self.paused:
+						self.start()
+					elif self.playing and self.paused:
+						self.resume()
+					else:
+						counter = 0
 				else:
 					counter += 1
 					time.sleep(1)
-					print("Searching for device.")
+					print("Searching for device.({})".format(counter))
 					if counter > 10:
-						self.stop()
+						self.pause()
+						counter = 0
+				schedule.run_pending()
+				
 			except KeyboardInterrupt:
 				exit(0)
 			except:
@@ -187,8 +204,8 @@ if __name__ == "__main__":
 			time.sleep(30)
 	player = Player(DOWNLOADS_FOLDER, client)
 
-	schedule.every().day.at("06:00").do(player.download_playlist, client=client, downloads_folder=DOWNLOADS_FOLDER)
-	schedule.every().day.at("06:40").do(player.delete_playlist)
-	schedule.every().day.at("06:50").do(player.prepare_playlist)
+	schedule.every().day.at("23:22").do(player.download_playlist, client_obj=client, downloads_folder=DOWNLOADS_FOLDER)
+	schedule.every().day.at("23:30").do(player.delete_playlist)
+	schedule.every().day.at("23:35").do(player.prepare_playlist)
 
 	player.polling()
