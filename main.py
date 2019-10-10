@@ -7,14 +7,11 @@ import time
 import traceback
 from datetime import datetime, timedelta
 from os.path import isfile
-import asyncio
 
 import pygame
-import yandex_music
-from pygame import mixer
-
-from yandex_music.client import Client
 import schedule
+from pygame import mixer
+from yandex_music.client import Client
 from yandex_music.exceptions import NetworkError
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -66,6 +63,7 @@ class Player:
 	ready = False
 	paused = False
 	playing = False
+	freezed = False
 
 	def __init__(self, downloads_folder, client):
 		self.client = client
@@ -115,26 +113,43 @@ class Player:
 			self.download_playlist(self.client, DOWNLOADS_FOLDER)
 
 	def resume(self):
-		if self.ready and self.playing and self.paused:
+		if not self.freezed and self.ready and self.playing and self.paused:
 			print("Resumed.")
 			self.paused = False
 			mixer.music.unpause()
+			return True
+		else:
+			return False
 
 	def pause(self):  # blocks resume
-		print("Paused.")
-		mixer.music.pause()
-		self.paused = True
+		if not self.freezed and not self.paused and self.playing:
+			print("Paused.")
+			mixer.music.pause()
+			self.paused = True
+			return True
+		else:
+			return False
 
 	def start(self):
-		print("Started.")
-		if self.ready:
+		if not self.freezed and self.ready:
+			print("Started.")
 			self.playing = True
+			self.paused = False
 			mixer.music.play()
+			return True
+		else:
+			print("Not ready to start.")
+			return False
 
 	def stop(self):
-		print("Stopped.")
-		self.playing = False
-		mixer.music.stop()
+		if not self.freezed and self.playing:
+			print("Stopped.")
+			self.playing = False
+			self.paused = False
+			mixer.music.stop()
+			return True
+		else:
+			return False
 
 	def polling(self):
 		counter = 0
@@ -147,15 +162,15 @@ class Player:
 						self.resume()
 					else:
 						counter = 0
+				elif counter > 10 and not self.freezed:
+					self.pause()
+					time.sleep(1)
+					counter = 0
 				else:
 					counter += 1
 					time.sleep(1)
 					print("Searching for device.({})".format(counter))
-					if counter > 10:
-						self.pause()
-						counter = 0
 				schedule.run_pending()
-
 			except KeyboardInterrupt:
 				exit(0)
 			except:
@@ -185,7 +200,7 @@ class Player:
 	def delete_playlist(self):
 		try:
 			boundary_date = datetime.now() - timedelta(days=3)
-			folder = os.path.join(BASE_DIR, "downloads")
+			folder = os.path.join(BASE_DIR, DOWNLOADS_FOLDER)
 			dirs = os.listdir(folder)
 			for dir_ in dirs:
 				try:
@@ -197,6 +212,24 @@ class Player:
 		except:
 			print(traceback.format_exc())
 
+	def wake_me_up(self):
+		for i in range(10):
+			try:
+				if self.ready:
+					if self.playing:
+						self.resume()
+					else:
+						self.start()
+					self.freezed = True
+				else:
+					time.sleep(20)
+			except:
+				time.sleep(5)
+				print(traceback.format_exc())
+
+	def unfreeze(self):
+		self.freezed = False
+		self.pause()
 
 if __name__ == "__main__":
 	assert LOGIN and PASSWORD and DOWNLOADS_FOLDER, "SETTINGS ARE NOT CORRECT"
@@ -214,4 +247,6 @@ if __name__ == "__main__":
 	schedule.every().day.at(TIME_OF_DELETE).do(player.delete_playlist)
 	schedule.every().day.at(TIME_OF_PREPARE).do(player.prepare_playlist)
 
+	schedule.every().day.at(TIME_OF_WAKE_UP).do(player.wake_me_up)
+	schedule.every().day.at(TIME_OF_WAKE_UP_UNTIL).do(player.unfreeze)
 	player.polling()
